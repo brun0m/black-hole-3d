@@ -7,6 +7,7 @@ export const vsSource = `
     uniform mat4 uView;
     uniform mat4 uProj;
     uniform vec3 uViewPos;
+    uniform float uSwallow;
     
     varying vec3 vWorldPos;
     varying vec3 vNorm;
@@ -20,7 +21,11 @@ export const vsSource = `
         gl_Position = uProj * uView * worldPos;
 
         float dist = length(uViewPos - worldPos.xyz);
-        gl_PointSize = 400.0 / dist;
+
+        // Estrelas: limita tamanho e, durante o "engolido", alonga um pouco
+        float ps = 360.0 / max(dist, 0.001);
+        ps = clamp(ps, 1.5, 6.0 + 18.0 * uSwallow);
+        gl_PointSize = ps;
     }
 `;
 
@@ -37,6 +42,8 @@ export const fsSource = `
     uniform vec3 uLightPos;
     uniform sampler2D uTexture;
     uniform int uType; // 0=Sala, 1=Buraco Negro, 2=Asteroide, 3=Luz, 4=Estrelas
+    uniform vec2 uResolution;
+    uniform float uSwallow;
     
     // --- Noise Functions ---
     float hash(float n) { return fract(sin(n) * 43758.5453123); }
@@ -45,10 +52,19 @@ export const fsSource = `
         vec3 f = fract(x);
         f = f * f * (3.0 - 2.0 * f);
         float n = p.x + p.y * 57.0 + 113.0 * p.z;
-        return mix(mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
-                       mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
-                   mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
-                       mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
+        return mix(
+            mix(
+                mix(hash(n + 0.0),   hash(n + 1.0),   f.x),
+                mix(hash(n + 57.0),  hash(n + 58.0),  f.x),
+                f.y
+            ),
+            mix(
+                mix(hash(n + 113.0), hash(n + 114.0), f.x),
+                mix(hash(n + 170.0), hash(n + 171.0), f.x),
+                f.y
+            ),
+            f.z
+        );
     }
     float fbm(vec3 p) {
         float f = 0.0;
@@ -62,12 +78,23 @@ export const fsSource = `
         // TIPO 4: Estrelas
         if (uType == 4) {
             vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
+
+            // Durante o "engolido", as estrelas viram pequenos "streaks" (sem pós-processo)
+            circCoord.x *= (1.0 + uSwallow * 10.0);
+
             float alpha = 1.0 - dot(circCoord, circCoord);
             if (alpha < 0.0) discard;
-            float twinkle = 0.5 + 0.5 * sin(uTime * 5.0 + gl_FragCoord.x);
-            gl_FragColor = vec4(vec3(1.0) * twinkle, alpha);
+
+            float twinkle = 0.55 + 0.45 * sin(uTime * (5.0 + 25.0*uSwallow) + gl_FragCoord.x);
+            vec3 starCol = vec3(1.0) * twinkle;
+
+            // Some no blackout
+            starCol *= (1.0 - uSwallow);
+
+            gl_FragColor = vec4(starCol, alpha * (1.0 - uSwallow));
             return;
         }
+
         // TIPO 3: Luz
         if (uType == 3) {
             gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0);
@@ -97,7 +124,9 @@ export const fsSource = `
             float diff = max(dot(norm, lightDir), 0.0);
             vec3 ambient = uColor * 0.1;
             vec3 diffuse = diff * uColor;
-            float grid = step(0.98, fract(vWorldPos.x)) + step(0.98, fract(vWorldPos.z)) + step(0.98, fract(vWorldPos.y));
+            float grid = step(0.98, fract(vWorldPos.x)) +
+                         step(0.98, fract(vWorldPos.z)) +
+                         step(0.98, fract(vWorldPos.y));
             vec3 finalColor = ambient + diffuse + (vec3(0.1) * grid);
             gl_FragColor = vec4(finalColor, 1.0);
             return;
@@ -120,9 +149,18 @@ export const fsSource = `
         float eventHorizon = schwarzschildRadius * 1.2; 
         float accretionDiskRadius = 4.5;
         
-        for(int i = 0; i < 150; i++) {
-            p += rd * 0.15; 
+        // "Jitter" reduz banding/camadas
+        float jitter = hash(gl_FragCoord.x + gl_FragCoord.y * 57.0 + uTime * 10.0);
+        p += rd * (jitter * 0.08);
+
+        for(int i = 0; i < 220; i++) {
             float distToCenter = length(p - bhCenter);
+
+            float stepSize = mix(0.28, 0.06, smoothstep(2.0, 7.0, distToCenter));
+            p += rd * stepSize;
+
+            // ✅ Correção: aqui só atualiza, não redeclara
+            distToCenter = length(p - bhCenter);
             
             // --- 1. Horizonte de Eventos ---
             if (distToCenter < eventHorizon) {
@@ -178,12 +216,32 @@ export const fsSource = `
                 col += plasmaColor * stepDensity * (1.0 - min(totalDensity, 1.0));
                 totalDensity += stepDensity;
             }
-            if (totalDensity >= 1.0 || distToCenter > 12.0) break;
+
+            if (totalDensity >= 1.0 || distToCenter > 14.0) break;
         }
         
         col = col / (1.0 + col);
         col = pow(col, vec3(0.45));
+
+        // Bloom fake (sem framebuffer)
+        float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+        col += col * smoothstep(0.45, 1.2, luma) * 0.35;
+
+        // Vinheta cinematográfica + blackout do "engolido"
+        vec2 uv = gl_FragCoord.xy / uResolution;
+        float vig = smoothstep(0.95, 0.25, distance(uv, vec2(0.5)));
+        col *= mix(0.92, 1.10, vig);
+
+        // Dither sutil (reduz banding)
+        float dd = hash(gl_FragCoord.x + gl_FragCoord.y * 13.0) - 0.5;
+        col += dd * (1.0/255.0);
+
+        // Blackout progressivo
+        col = mix(col, vec3(0.0), smoothstep(0.0, 1.0, uSwallow));
+
         float alpha = smoothstep(0.0, 0.2, totalDensity);
+        alpha *= (1.0 - uSwallow);
+
         gl_FragColor = vec4(col, alpha); 
     }
 `;
