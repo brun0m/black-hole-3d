@@ -1,10 +1,10 @@
 export function initSpaceAudio() {
-    // Variável para evitar recriar o contexto
+
     if (window.isAudioStarted) return;
-    
+
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
-    
+
     const createDrone = (freq, type, vol) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -12,8 +12,8 @@ export function initSpaceAudio() {
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         const lfo = audioCtx.createOscillator();
         const lfoGain = audioCtx.createGain();
-        lfo.frequency.value = 0.05; 
-        lfoGain.gain.value = 2.0;   
+        lfo.frequency.value = 0.05;
+        lfoGain.gain.value = 2.0;
         lfo.connect(lfoGain);
         lfoGain.connect(osc.frequency);
         lfo.start();
@@ -23,7 +23,7 @@ export function initSpaceAudio() {
         osc.start();
     };
 
-    createDrone(55.0, 'sine', 0.15); 
+    createDrone(55.0, 'sine', 0.15);
     createDrone(58.0, 'triangle', 0.05);
     createDrone(220.0, 'sine', 0.02);
 
@@ -37,7 +37,7 @@ export function initSpaceAudio() {
     noise.loop = true;
     const noiseFilter = audioCtx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 400; 
+    noiseFilter.frequency.value = 400;
     const noiseGain = audioCtx.createGain();
     noiseGain.gain.value = 0.08;
     noise.connect(noiseFilter);

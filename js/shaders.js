@@ -45,7 +45,7 @@ export const fsSource = `
     uniform vec2 uResolution;
     uniform float uSwallow;
     
-    // --- Noise Functions ---
+    
     float hash(float n) { return fract(sin(n) * 43758.5453123); }
     float noise(vec3 x) {
         vec3 p = floor(x);
@@ -79,7 +79,6 @@ export const fsSource = `
         if (uType == 4) {
             vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
 
-            // Durante o "engolido", as estrelas viram pequenos "streaks" (sem pós-processo)
             circCoord.x *= (1.0 + uSwallow * 10.0);
 
             float alpha = 1.0 - dot(circCoord, circCoord);
@@ -88,7 +87,6 @@ export const fsSource = `
             float twinkle = 0.55 + 0.45 * sin(uTime * (5.0 + 25.0*uSwallow) + gl_FragCoord.x);
             vec3 starCol = vec3(1.0) * twinkle;
 
-            // Some no blackout
             starCol *= (1.0 - uSwallow);
 
             gl_FragColor = vec4(starCol, alpha * (1.0 - uSwallow));
@@ -141,7 +139,6 @@ export const fsSource = `
         float totalDensity = 0.0;
         vec3 p = ro; 
         
-        // Otimização
         float distToBox = length(p - bhCenter) - 9.0;
         if (distToBox > 0.0) p += rd * distToBox;
 
@@ -149,7 +146,6 @@ export const fsSource = `
         float eventHorizon = schwarzschildRadius * 1.2; 
         float accretionDiskRadius = 4.5;
         
-        // "Jitter" reduz banding/camadas
         float jitter = hash(gl_FragCoord.x + gl_FragCoord.y * 57.0 + uTime * 10.0);
         p += rd * (jitter * 0.08);
 
@@ -159,10 +155,8 @@ export const fsSource = `
             float stepSize = mix(0.28, 0.06, smoothstep(2.0, 7.0, distToCenter));
             p += rd * stepSize;
 
-            // ✅ Correção: aqui só atualiza, não redeclara
             distToCenter = length(p - bhCenter);
             
-            // --- 1. Horizonte de Eventos ---
             if (distToCenter < eventHorizon) {
                 col = vec3(0.0);
                 totalDensity = 100.0; 
@@ -223,20 +217,16 @@ export const fsSource = `
         col = col / (1.0 + col);
         col = pow(col, vec3(0.45));
 
-        // Bloom fake (sem framebuffer)
         float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
         col += col * smoothstep(0.45, 1.2, luma) * 0.35;
 
-        // Vinheta cinematográfica + blackout do "engolido"
         vec2 uv = gl_FragCoord.xy / uResolution;
         float vig = smoothstep(0.95, 0.25, distance(uv, vec2(0.5)));
         col *= mix(0.92, 1.10, vig);
 
-        // Dither sutil (reduz banding)
         float dd = hash(gl_FragCoord.x + gl_FragCoord.y * 13.0) - 0.5;
         col += dd * (1.0/255.0);
 
-        // Blackout progressivo
         col = mix(col, vec3(0.0), smoothstep(0.0, 1.0, uSwallow));
 
         float alpha = smoothstep(0.0, 0.2, totalDensity);

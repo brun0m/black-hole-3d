@@ -71,7 +71,6 @@ export function createSpaceRockTexture() {
     return c;
 }
 
-// O OBJ gigante fica aqui para não poluir
 export const asteroidOBJ = `
 v -0.525731 0.000000 0.850651
 v 0.525731 0.000000 0.850651

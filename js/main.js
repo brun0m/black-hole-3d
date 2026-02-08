@@ -6,7 +6,6 @@ import { parseOBJString, createSpaceRockTexture, asteroidOBJ } from './utils.js'
 
 const canvas = document.getElementById('canvas');
 
-// ---------- GL Context ----------
 let gl = canvas.getContext('webgl2', { alpha: false, depth: true, antialias: true });
 let isWebGL2 = !!gl;
 if (!gl) gl = canvas.getContext('webgl', { alpha: false, depth: true, antialias: true });
@@ -16,7 +15,7 @@ gl.enable(gl.DEPTH_TEST);
 gl.depthFunc(gl.LEQUAL);
 gl.enable(gl.CULL_FACE);
 
-// ---------- Shader helpers ----------
+
 function createShader(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
@@ -41,7 +40,7 @@ if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
 }
 gl.useProgram(prog);
 
-// ---------- Locations ----------
+
 const locs = {
   aPos: gl.getAttribLocation(prog, 'aPos'),
   aNorm: gl.getAttribLocation(prog, 'aNorm'),
@@ -61,7 +60,7 @@ const locs = {
   uSwallow: gl.getUniformLocation(prog, 'uSwallow')
 };
 
-// ---------- VAO support ----------
+
 const vaoExt = (!isWebGL2) ? gl.getExtension('OES_vertex_array_object') : null;
 
 function createVAO() {
@@ -77,7 +76,7 @@ function unbindVAO() {
   else if (vaoExt) vaoExt.bindVertexArrayOES(null);
 }
 
-// ---------- Geometry ----------
+
 function createCube() {
   const positions = [
     -1,-1,1,  1,-1,1,  1, 1,1,  -1, 1,1,
@@ -132,14 +131,14 @@ function createBufferInfo(data, { indexed = false, withNormals = false, withTex 
   const vao = createVAO();
   bindVAO(vao);
 
-  // positions
+  
   const posBuf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
   gl.bufferData(gl.ARRAY_BUFFER, data.positions, gl.STATIC_DRAW);
   gl.enableVertexAttribArray(locs.aPos);
   gl.vertexAttribPointer(locs.aPos, 3, gl.FLOAT, false, 0, 0);
 
-  // normals
+ 
   if (withNormals && data.normals && locs.aNorm !== -1) {
     const nBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, nBuf);
@@ -151,7 +150,7 @@ function createBufferInfo(data, { indexed = false, withNormals = false, withTex 
     gl.vertexAttrib3f(locs.aNorm, 0, 1, 0);
   }
 
-  // texcoords
+  
   if (withTex && data.texCoords && locs.aTexCoord !== -1) {
     const tBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, tBuf);
@@ -175,18 +174,18 @@ function createBufferInfo(data, { indexed = false, withNormals = false, withTex 
   return { vao, count: data.count, indexed: hasIndices };
 }
 
-// Buffers
+
 const cubeInfo = createBufferInfo(createCube(), { indexed: true, withNormals: true, withTex: true });
 const starsInfo = createBufferInfo(createStarField(2800), { indexed: false, withNormals: false, withTex: false });
 
-// Asteroid mesh (OBJ)
+
 const asteroidData = parseOBJString(asteroidOBJ);
 const asteroidInfo = createBufferInfo(
   { positions: asteroidData.positions, normals: asteroidData.normals, texCoords: asteroidData.texCoords, count: asteroidData.count },
   { indexed: false, withNormals: true, withTex: true }
 );
 
-// Asteroid texture (procedural)
+
 const asteroidTex = gl.createTexture();
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, asteroidTex);
@@ -195,25 +194,24 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 gl.generateMipmap(gl.TEXTURE_2D);
 
-// ---------- Scene ----------
+
 const bhCenter = [0, 3.5, 0];
 
 const objects = [
-  // Buraco negro (volume)
+  
   { type: 1, p: [0, 3.5, 0], s: [8, 8, 8], c: [0, 0, 0], mesh: cubeInfo },
 
-  // Estrelas (fundo)
+  
   { type: 4, p: [0, 0, 0], s: [1, 1, 1], c: [1, 1, 1], mesh: starsInfo, isStars: true }
 ];
 
-// Asteroides ao redor (neutros/pedra, mas visíveis)
+
 const AST_COUNT = 14;
 for (let i = 0; i < AST_COUNT; i++) {
   const angle = (i / AST_COUNT) * Math.PI * 2.0 + (Math.random() * 0.6);
-  const r = 6.5 + Math.random() * 3.5; // anel em volta
+  const r = 6.5 + Math.random() * 3.5; 
   const y = 2.0 + Math.random() * 3.2;
 
-  // cor de pedra neutra, mas com leve variação
   const base = 0.45 + Math.random() * 0.18;
   const c = [base, base * 0.95, base * 0.9];
 
@@ -222,7 +220,7 @@ for (let i = 0; i < AST_COUNT; i++) {
   objects.push({
     type: 2,
     p: [Math.cos(angle) * r, y, Math.sin(angle) * r],
-    s: [s, s * (0.7 + Math.random() * 0.6), s], // um pouco irregular
+    s: [s, s * (0.7 + Math.random() * 0.6), s], 
     c,
     mesh: asteroidInfo,
     isAst: true,
@@ -237,7 +235,7 @@ for (let i = 0; i < AST_COUNT; i++) {
   });
 }
 
-// ---------- Input ----------
+
 const camera = { pos: [0, 2.0, 14], yaw: -Math.PI / 2, pitch: 0 };
 const keys = {};
 let mouseLocked = false;
@@ -260,7 +258,7 @@ document.onmousemove = e => {
   camera.pitch = Math.max(-1.4, Math.min(1.4, camera.pitch - e.movementY * 0.002));
 };
 
-// ---------- Resize (DPR) ----------
+
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.floor(window.innerWidth * dpr);
@@ -270,18 +268,18 @@ function resize() {
 window.onresize = resize;
 resize();
 
-// ---------- Modo Engolido ----------
+
 let swallow = 0.0;
 let swallowed = false;
 
-// Shake (tremor) conforme aproxima do BH
+
 function proximityFactorXZ() {
   const dx = camera.pos[0] - 0.0;
   const dz = camera.pos[2] - 0.0;
   const d = Math.sqrt(dx * dx + dz * dz);
-  // 0 longe (>= 14), 1 bem perto (<= 3)
+ 
   const t = 1.0 - Math.min(1.0, Math.max(0.0, (d - 3.0) / 11.0));
-  // curva suave
+  
   return t * t * (3.0 - 2.0 * t);
 }
 
@@ -292,15 +290,14 @@ function updateSwallow(dt) {
   if (swallowed) {
     swallow = Math.min(1.0, swallow + dt * 0.45);
 
-    // Puxa para o centro (sensação de queda)
+   
     const k = swallow * swallow * (3.0 - 2.0 * swallow);
     camera.pos[0] *= (1.0 - dt * (0.6 + 3.2 * k));
     camera.pos[2] *= (1.0 - dt * (0.6 + 3.2 * k));
 
-    // Desorientação suave
     camera.yaw += dt * (0.35 + 1.2 * k);
 
-    // Reset quando blackout completa
+ 
     if (swallow >= 1.0) {
       swallowed = false;
       swallow = 0.0;
@@ -311,14 +308,14 @@ function updateSwallow(dt) {
   }
 }
 
-// ---------- Render loop ----------
+
 let lastTime = 0;
 function render(now) {
   const dt = (now - lastTime) * 0.001;
   lastTime = now;
   const timeSec = now * 0.001;
 
-  // Movimento (travado durante engolido)
+  
   if (mouseLocked && !swallowed) {
     const f = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     const s = (keys['a'] ? 1 : 0) - (keys['d'] ? 1 : 0);
@@ -333,7 +330,6 @@ function render(now) {
 
   updateSwallow(dt);
 
-  // Atualiza asteroides (órbitas) — com leve aceleração quando perto do BH
   const prox = proximityFactorXZ();
   const speedBoost = 1.0 + prox * 1.8 + swallow * 2.5;
   for (const o of objects) {
@@ -341,19 +337,18 @@ function render(now) {
     const a = o.anim.phase + timeSec * o.anim.orbitSpeed * speedBoost;
     o.p[0] = Math.cos(a) * o.anim.orbitR;
     o.p[2] = Math.sin(a) * o.anim.orbitR;
-    // micro variação em Y (bem sutil)
+
     o.p[1] = o.anim.orbitY + Math.sin(timeSec * 0.8 + o.anim.seed) * 0.15;
   }
 
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // FOV dramático no engolido
   const baseFov = Math.PI / 3;
   const fov = baseFov + swallow * 0.35;
   const proj = Mat4.persp(fov, canvas.width / canvas.height, 0.01, 220);
 
-  // Tremor conforme aproxima
+
   const trem = proximityFactorXZ();
   const tremAmp = (0.01 + 0.08 * trem) + (0.14 * swallow);
   const t1 = timeSec * (8.0 + 18.0 * trem);
@@ -375,12 +370,10 @@ function render(now) {
 
   const view = Mat4.look(eye, target, [0, 1, 0]);
 
-  // Luz “fria” girando só pra dar relevo nos asteroides
   const lightX = Math.sin(timeSec * 0.8) * 7.0;
   const lightZ = Math.cos(timeSec * 0.8) * 7.0;
   const lightPos = [lightX, 5.5, lightZ];
 
-  // Uniforms globais
   gl.uniformMatrix4fv(locs.uProj, false, proj);
   gl.uniformMatrix4fv(locs.uView, false, view);
   gl.uniform3fv(locs.uViewPos, eye);
@@ -389,20 +382,16 @@ function render(now) {
   gl.uniform2f(locs.uResolution, canvas.width, canvas.height);
   gl.uniform1f(locs.uSwallow, swallow);
 
-  // textura no slot 0
   gl.uniform1i(locs.uTexture, 0);
 
-  // Draw
   for (const o of objects) {
     let m = Mat4.identity();
     m = Mat4.translate(m, o.p);
 
-    // Asteroides: rotação + leve “spaghettification” quando muito perto
     if (o.anim) {
       const rot = timeSec * o.anim.rotSpeed * speedBoost;
       m = Mat4.rotateY(m, rot);
 
-      // estica um pouco ao aproximar (efeito divertido, mas sutil)
       const d = Math.hypot(o.p[0], o.p[2]);
       const stretch = Math.max(0.0, Math.min(1.0, (3.8 - d) / 2.0));
       const st = stretch * stretch;
@@ -420,7 +409,6 @@ function render(now) {
     gl.uniform3fv(locs.uColor, o.c);
     gl.uniform1i(locs.uType, o.type);
 
-    // Buraco negro: render com face dupla e sem escrita de depth
     if (o.type === 1) {
       gl.depthMask(false);
       gl.disable(gl.CULL_FACE);
@@ -449,7 +437,6 @@ function render(now) {
   requestAnimationFrame(render);
 }
 
-// Loading overlay
 setTimeout(() => {
   const l = document.getElementById('loading');
   if (l) l.classList.add('hidden');
