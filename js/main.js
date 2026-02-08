@@ -3,6 +3,7 @@ import { vsSource, fsSource } from './shaders.js';
 import { initSpaceAudio } from './audio.js';
 import { parseOBJString, createSpaceRockTexture, asteroidOBJ } from './utils.js';
 
+
 const canvas = document.getElementById('canvas');
 
 // ---------- GL Context ----------
